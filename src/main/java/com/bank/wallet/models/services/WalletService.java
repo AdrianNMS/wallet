@@ -12,4 +12,5 @@ public interface WalletService
     Mono<Wallet> create(Wallet wallet);
     Mono<Wallet> update(String id, Wallet wallet);
     Mono<Object> delete(String id);
+    Mono<Wallet> updateBootCoins(String id, Float bootcoins);
 }

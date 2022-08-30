@@ -2,12 +2,18 @@ package com.bank.wallet.controllers;
 
 import com.bank.wallet.handler.ResponseHandler;
 import com.bank.wallet.models.documents.Wallet;
+import com.bank.wallet.models.enums.TransferenceType;
+import com.bank.wallet.models.kafka.RequestWallet;
+import com.bank.wallet.models.kafka.ResponseTransference;
 import com.bank.wallet.models.services.WalletService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -18,6 +24,9 @@ public class WalletRestController
 {
     @Autowired
     private WalletService walletService;
+
+    @Autowired
+    private KafkaTemplate<String, ResponseTransference> template;
 
     private static final Logger log = LoggerFactory.getLogger(WalletRestController.class);
 
@@ -60,5 +69,61 @@ public class WalletRestController
                 .flatMap(o -> Mono.just(ResponseHandler.response("Done", HttpStatus.OK, null)))
                 .onErrorResume(error -> Mono.just(ResponseHandler.response(error.getMessage(), HttpStatus.BAD_REQUEST, null)))
                 .switchIfEmpty(Mono.just(ResponseHandler.response("Error", HttpStatus.NO_CONTENT, null)));
+    }
+
+    @KafkaListener(topics = "wallet-check", groupId = "wallet")
+    public void receiveCheckBootcoins(@Payload RequestWallet requestWallet)
+    {
+        var userCheck = (requestWallet.getTransferenceType() == TransferenceType.BUY)
+                ? requestWallet.getIdReceiver() : requestWallet.getIdSender();
+
+        log.info(userCheck);
+
+        walletService.find(userCheck).subscribe(wallet -> {
+            var response = ResponseTransference.builder()
+                    .idTransference(requestWallet.getIdTransference())
+                    .status(wallet.getBootcoins()>=requestWallet.getBootcoins())
+                    .build();
+
+            log.info(response.toString());
+
+            template.send("transference_wallet-check",response);
+
+        });
+    }
+
+    @KafkaListener(topics = "wallet-update", groupId = "wallet")
+    public void receiveUpdateBootcoins(@Payload RequestWallet requestWallet)
+    {
+        var user1Check = (requestWallet.getTransferenceType() == TransferenceType.BUY)
+                ? requestWallet.getIdReceiver() : requestWallet.getIdSender();
+        var user2Check = (requestWallet.getTransferenceType() == TransferenceType.BUY)
+                ? requestWallet.getIdSender() : requestWallet.getIdReceiver();
+
+        log.info(user1Check);
+        log.info(user2Check);
+
+        walletService.updateBootCoins(user1Check, requestWallet.getBootcoins())
+                .subscribe(wallet -> {
+
+                    log.info(wallet.toString());
+
+                    if(wallet!=null)
+                        walletService.updateBootCoins(user2Check, -requestWallet.getBootcoins())
+                                .subscribe(wallet1 -> {
+
+                                    log.info(wallet1.toString());
+
+                                    template.send("transference_wallet-update",ResponseTransference.builder()
+                                            .idTransference(requestWallet.getIdTransference())
+                                            .status((wallet1!=null))
+                                            .build());
+                                });
+                    else
+                        template.send("transference_wallet-update",ResponseTransference.builder()
+                                .idTransference(requestWallet.getIdTransference())
+                                .status(false)
+                                .build());
+                });
     }
 }

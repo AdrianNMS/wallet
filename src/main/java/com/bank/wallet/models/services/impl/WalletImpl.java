@@ -78,4 +78,12 @@ public class WalletImpl implements WalletService
                 return Mono.empty();
         });
     }
+
+    @Override
+    public Mono<Wallet> updateBootCoins(String id, Float bootcoins) {
+        return dao.findById(id).flatMap(wallet -> {
+            wallet.setBootcoins(wallet.getBootcoins() + bootcoins);
+            return dao.save(wallet);
+        }).switchIfEmpty(Mono.empty());
+    }
 }
