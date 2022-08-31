@@ -80,9 +80,12 @@ public class WalletRestController
         log.info(userCheck);
 
         walletService.find(userCheck).subscribe(wallet -> {
+
+            var status = (wallet!=null && wallet.getBootcoins()>=requestWallet.getBootcoins());
+
             var response = ResponseTransference.builder()
                     .idTransference(requestWallet.getIdTransference())
-                    .status(wallet.getBootcoins()>=requestWallet.getBootcoins())
+                    .status(status)
                     .build();
 
             log.info(response.toString());
