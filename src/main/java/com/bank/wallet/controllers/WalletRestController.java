@@ -120,9 +120,9 @@ public class WalletRestController
         log.info("[INI] receiveUpdateBootcoins");
 
         var user1Check = (requestWallet.getTransferenceType() == TransferenceType.BUY)
-                ? requestWallet.getIdReceiver() : requestWallet.getIdSender();
-        var user2Check = (requestWallet.getTransferenceType() == TransferenceType.BUY)
                 ? requestWallet.getIdSender() : requestWallet.getIdReceiver();
+        var user2Check = (requestWallet.getTransferenceType() == TransferenceType.BUY)
+                ? requestWallet.getIdReceiver() : requestWallet.getIdSender();
 
         log.info(user1Check);
         log.info(user2Check);
